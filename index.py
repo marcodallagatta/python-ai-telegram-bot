@@ -23,6 +23,7 @@ model = genai.GenerativeModel("gemini-1.5-flash")
 
 last_date = ''
 complete_message = ''
+history = {}
 
 
 async def gemini(message):
@@ -47,7 +48,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print('REJECTED: not a whitelisted account (id:', update.message.chat.id, ')')
         return
 
-    await context.bot.send_message(chat_id=update.effective_chat.id, text='Welcome to mAIella!')
+    if update.message.chat.id in history:
+        history[update.message.chat.id] = ''
+
+    await context.bot.send_message(chat_id=update.effective_chat.id, text='Welcome to mAIella! This is a new chat.')
 
 
 async def summarize(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -84,16 +88,21 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         print('REJECTED: not a whitelisted account (id:', update.message.chat.id, ')')
         return
 
-    if last_date == update.message.date:
-        complete_message += update.message.text
-        return
-    else:
-        complete_message = update.message.text
+    if update.message.chat.id not in history or (update.message.date - last_date).total_seconds() > 3660:
+        history[update.message.chat.id] = ''
+        await context.bot.send_message(chat_id=update.effective_chat.id, text='This is a new chat. Chats older than 1 hour are not summarized. Use /start to also start a new chat.')
+    history[update.message.chat.id] += f"\n{update.message.text}"
+
+    # if last_date == update.message.date:
+    # history[update.message.chat.id] += update.message.text
+    # return
+    # else:
+    # history[update.message.chat.id] += update.message.text
 
     last_date = update.message.date
 
     # The rest of your function continues here
-    response = await gemini(complete_message)
+    response = await gemini(history[update.message.chat.id])
     await context.bot.send_message(chat_id=update.effective_chat.id, text=response)
 
 
